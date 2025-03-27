@@ -69,62 +69,49 @@ class MainService extends Service {
 
 
 
-    // Мониторинг добавления/обновления списка обзвона
+    /**
+    * Обработчик обновления списка обзвона
+    */
     async afterUpdateSimpleCalllists(params_: IDataUpdateParams<IBaseEntity>) {
         //this.log.debug('afterUpdateSimpleCalllists -> params_:\n', params_);
 
-        //// Добавление И обновлене
-        //if (params_.updateKind === EUpdateKind.Insert || params_.updateKind === EUpdateKind.Modify) {
+        // Ранний выход, если событие не является обновлением
+        if (params_.updateKind !== EUpdateKind.Modify) return;
 
         try {
-            // Обновлене
-            if (params_.updateKind === EUpdateKind.Modify) {
-                this.log.debug('afterUpdateSimpleCalllists, params_:\n', params_);
+            // Параметры
+            const { id: entityId, oldData = {}, newData = {} } = params_;
+            const oldTryCount = oldData.tryCount ?? 0;
+            const newTryCount = newData.tryCount ?? 0;
 
-                // Параметры
-                const entityId = params_.id;
-                const oldTryCount = params_.oldData?.tryCount ?? 0;
-                const newTryCount = params_.newData?.tryCount ?? 0;
+            this.log.debug('Calllist counters:', { entityId, oldTryCount, newTryCount });
 
-                this.log.debug('afterUpdateSimpleCalllists -> test', { entityId, oldTryCount, newTryCount });
-
-
-                // Если счетчик попыток увеличился и равен 2
-                if (newTryCount >= 2 && newTryCount > oldTryCount) {
-
-                    const startOfNextDay = this.getStartOfNextHour();
-
-                    this.log.debug('afterUpdateSimpleCalllists -> startOfNextDay', startOfNextDay);
-
-                    const simpleCalllist = await this._simpleCalllists.getByIDStrong(entityId);
-                    simpleCalllist.scheduledTime = startOfNextDay;
-                }
-
-
-                /*
-                // Данные сессии
-                const session = DataFactory.sessionInfo;
-                //this.log.debug('sessionInfo: ', session);
-
-                // Ключа integration_point_id нет в явном виде,
-                // получаем значение через приведение к JSON
-                const integrationPointId = JSON.parse(JSON.stringify(session)).integration_point_id;
-                //this.log.debug('#integrationPointId: ', integrationPointId);
-                */
-
-                //if (modifierId !== integrationPointId) {
-                //this.log.debug('afterUpdateRecommendedBls, params_:\n', params_);
-
-
-
-                //} // if (modifierId !==
+            // Проверка условия для переноса на следующий день
+            if (this.checkTwoAttempts(newTryCount, oldTryCount)) {
+                await this.moveCallToNextDay(entityId);
             }
+
+
+            /*
+            // Данные сессии
+            const session = DataFactory.sessionInfo;
+            //this.log.debug('sessionInfo: ', session);
+
+            // Ключа integration_point_id нет в явном виде,
+            // получаем значение через приведение к JSON
+            const integrationPointId = JSON.parse(JSON.stringify(session)).integration_point_id;
+            //this.log.debug('#integrationPointId: ', integrationPointId);
+            */
+
+            //if (modifierId !== integrationPointId) {
+            //this.log.debug('afterUpdateRecommendedBls, params_:\n', params_);
+            //} // if (modifierId !==
+
         }
         catch (e) {
             this.log.exception('afterUpdateBlacklists', e);
         }
     }
-
 
 
     //Поцедура -> возврат признак ЧС при вызове из сценария
@@ -163,7 +150,35 @@ class MainService extends Service {
 
     // functionsCode
 
-    // Функция возврашает дату/время начала следующего дня
+
+    /**
+    * Проверка условия для переноса звонка
+    */
+    private checkTwoAttempts(newTryCount: number, oldTryCount: number): boolean {
+        return newTryCount >= 2 && newTryCount > oldTryCount;
+    }
+
+
+    /**
+    * Перенос звонка на начало следующего дня
+    */
+    private async moveCallToNextDay(entityId: string): Promise<void> {
+
+        const call = await this._simpleCalllists.getByIDStrong(entityId);
+
+        if (!call) {
+            this.log.debug(`Calllist with ID ${entityId} not found`);
+            return;
+        }
+
+        // Обновление времени очередной попытки
+        call.scheduledTime = this.addOneHour();
+    }
+
+
+    /**
+    * Начало следующего дня
+    */
     private getStartOfNextDay(): Date {
         const nextDay = new Date();
         nextDay.setDate(nextDay.getDate() + 1);
@@ -171,8 +186,9 @@ class MainService extends Service {
         return nextDay;
     }
 
-
-    // Функция возврашает дату/время + 1 час
+    /**
+    * Начало следующего часа
+    */
     private getStartOfNextHour(): Date {
         const nextHour = new Date();
         nextHour.setHours(nextHour.getHours() + 1); // Добавляем 1 час
@@ -180,10 +196,8 @@ class MainService extends Service {
         return nextHour;
     }
 
-
     /**
-    * Возвращает текущую дату/время + 1 час
-    * (без обнуления минут/секунд/миллисекунд)
+    * Текущая дату/время + 1 час
     */
     private addOneHour(): Date {
         const date = new Date();
@@ -193,8 +207,6 @@ class MainService extends Service {
 
 
 }
-
-
 
 
 export default MainService;
