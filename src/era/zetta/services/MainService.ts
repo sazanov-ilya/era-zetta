@@ -87,7 +87,8 @@ class MainService extends Service {
             this.log.debug('Calllist counters:', { entityId, oldTryCount, newTryCount });
 
             // Проверка условия для переноса на следующий день
-            if (this.checkTwoAttempts(newTryCount, oldTryCount)) {
+            const attemptNmber = 2;
+            if (this.isAttemptNumber(attemptNmber, newTryCount, oldTryCount)) {
                 await this.moveCallToNextDay(entityId);
             }
 
@@ -114,7 +115,7 @@ class MainService extends Service {
     }
 
 
-    //Поцедура -> возврат признак ЧС при вызове из сценария
+    //Поцедура -> для вызова из сценария
     // Что-то пошло не так
     // В процедуру запрос прилетал, нонабора номера не было
     async check_exec(invocation_: IInvocation) {
@@ -154,25 +155,38 @@ class MainService extends Service {
     /**
     * Проверка условия для переноса звонка
     */
-    private checkTwoAttempts(newTryCount: number, oldTryCount: number): boolean {
-        return newTryCount >= 2 && newTryCount > oldTryCount;
+    //private checkTwoAttempts(newTryCount: number, oldTryCount: number): boolean {
+    //    return newTryCount === 2 && newTryCount > oldTryCount;
+    //}
+
+
+    /**
+    * Проверка необходимости переноса звонка при достижении заданного числа попыток
+    * @param attemptNmber - Число попыток для проверки 
+    * @param newCount - Текущее количество попыток
+    * @param oldCount - Предыдущее количество попыток
+    * @returns Возвращает true, только при переходе на заданное число попыток
+    */
+    private isAttemptNumber(attemptNmber: number, newCount: number, oldCount: number): boolean {
+        return newCount === attemptNmber && oldCount < attemptNmber;
     }
 
 
     /**
     * Перенос звонка на начало следующего дня
+    * @param entityId - id аабонента в списке
     */
     private async moveCallToNextDay(entityId: string): Promise<void> {
 
-        const call = await this._simpleCalllists.getByIDStrong(entityId);
+        // Получаем и обновляем абонента
+        const entityCall = await this._simpleCalllists.getByIDStrong(entityId);
 
-        if (!call) {
-            this.log.debug(`Calllist with ID ${entityId} not found`);
+        if (!entityCall) {
+            this.log.debug(`Абонент по ID ${entityId} не найден.`);
             return;
         }
 
-        // Обновление времени очередной попытки
-        call.scheduledTime = this.addOneHour();
+        entityCall.scheduledTime = this.addOneHour();
     }
 
 
