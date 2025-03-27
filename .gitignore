@@ -1,0 +1,18 @@
+# Игнорировать все файлы и папки
+*
+
+# Включить отслеживание package.json
+#!package.json
+!.gitignore
+
+# /--/ MainService.ts
+!/src/
+#!/src/index.ts
+!/src/era/
+!/src/era/zetta/
+!/src/era/zetta/services/
+!/src/era/zetta/services/MainService.ts
+
+# Отслеживание всего внутри папки src/era/zetta/services/
+#!/src/era/zetta/services/**
+
